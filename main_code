@@ -1,0 +1,48 @@
+
+"""
+Land Suitability analysis
+Author: Ilyas Nursamsi
+"""
+import arcpy
+from sys import argv
+
+def Model(Input_Landuse_Type="Landuse", Output_Suitable_Land="C:\\OneDrive - The University of Queensland\\Documents\\ArcGIS\\Projects\\Land_suitability_analysis\\Land_suitability_analysis.gdb\\Suitable_Land", Water_Buffer_Distance="50 Meters", Expression="Landtype = 'Vacant'"):  # Model
+
+    # To allow overwriting outputs change overwriteOutput option to True.
+    arcpy.env.overwriteOutput = False
+
+    # Model Environment settings
+    with arcpy.EnvManager(scratchWorkspace=r"C:\Users\s4626542\OneDrive - The University of Queensland\Documents\ArcGIS\Packages\Prac_1Package_4784de\p20\Land_suitability_analysis.gdb", workspace=r"C:\Users\s4626542\OneDrive - The University of Queensland\Documents\ArcGIS\Packages\Prac_1Package_4784de\p20\Land_suitability_analysis.gdb"):
+        Waterbody = "Waterbody"
+        Road = "Road"
+        elevation = "elevation"
+
+        # Process: Select (Select) (analysis)
+        Vacantland = fr"{arcpy.env.scratchGDB}\Vacantland"
+        arcpy.analysis.Select(in_features=Input_Landuse_Type, out_feature_class=Vacantland, where_clause=Expression)
+
+        # Process: Buffer (Buffer) (analysis)
+        Flooding_area = fr"{arcpy.env.scratchGDB}\Waterbody_Buffer"
+        arcpy.analysis.Buffer(in_features=Waterbody, out_feature_class=Flooding_area, buffer_distance_or_field=Water_Buffer_Distance, line_side="FULL", line_end_type="ROUND", dissolve_option="ALL", dissolve_field=[], method="PLANAR")
+
+        # Process: Erase (Erase) (analysis)
+        Unflooded_vacant_land = fr"{arcpy.env.scratchGDB}\Erase_Vacant"
+        arcpy.analysis.Erase(in_features=Vacantland, erase_features=Flooding_area, out_feature_class=Unflooded_vacant_land, cluster_tolerance="")
+
+        # Process: Buffer (2) (Buffer) (analysis)
+        Land_Near_Roads = fr"{arcpy.env.scratchGDB}\Road_Buffer"
+        arcpy.analysis.Buffer(in_features=Road, out_feature_class=Land_Near_Roads, buffer_distance_or_field="500 Meters", line_side="FULL", line_end_type="ROUND", dissolve_option="ALL", dissolve_field=[], method="PLANAR")
+
+        # Process: Intersect (Intersect) (analysis)
+        Unflooded_Vacant_Land_Near_Roads = fr"{arcpy.env.scratchGDB}\Vac_Road_Intersect"
+        arcpy.analysis.Intersect(in_features=[[Unflooded_vacant_land, ""], [Land_Near_Roads, ""]], out_feature_class=Unflooded_Vacant_Land_Near_Roads, join_attributes="ALL", cluster_tolerance="", output_type="INPUT")
+
+        # Process: Select (2) (Select) (analysis)
+        Elevation20m = fr"{arcpy.env.scratchGDB}\Elevation20m"
+        arcpy.analysis.Select(in_features=elevation, out_feature_class=Elevation20m, where_clause="gridcode <= 2")
+
+        # Process: Intersect (2) (Intersect) (analysis)
+        arcpy.analysis.Intersect(in_features=[[Unflooded_Vacant_Land_Near_Roads, ""], [Elevation20m, ""]], out_feature_class=Output_Suitable_Land, join_attributes="ALL", cluster_tolerance="", output_type="INPUT")
+
+if __name__ == '__main__':
+    Model(*argv[1:])
